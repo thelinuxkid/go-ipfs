@@ -5,7 +5,6 @@ package blockservice
 
 import (
 	"errors"
-	"fmt"
 
 	context "github.com/ipfs/go-ipfs/Godeps/_workspace/src/golang.org/x/net/context"
 	blocks "github.com/ipfs/go-ipfs/blocks"
@@ -50,7 +49,7 @@ type BlockService struct {
 // NewBlockService creates a BlockService with given datastore instance.
 func New(bs blockstore.Blockstore, rem exchange.Interface) (*BlockService, error) {
 	if bs == nil {
-		return nil, fmt.Errorf("BlockService requires valid blockstore")
+		panic("BlockService requires valid blockstore")
 	}
 	if rem == nil {
 		log.Warning("blockservice running in local (offline) mode.")

@@ -75,7 +75,7 @@ func NewMockNode() (*core.IpfsNode, error) {
 
 	nd.DAG = mdag.NewDAGService(bserv)
 
-	nd.Pinning = pin.NewPinner(nd.Repo.Datastore(), nd.DAG)
+	nd.Pinning = pin.NewPinner(nd.Repo.Datastore(), nd.DAG, nd.PrivDAG)
 
 	// Namespace resolver
 	nd.Namesys = nsys.NewNameSystem(nd.Routing)

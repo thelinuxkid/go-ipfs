@@ -62,6 +62,10 @@ func openDefaultDatastore(r *FSRepo) (repo.Datastore, error) {
 			Datastore: metricsBlocks,
 		},
 		{
+			Prefix:    ds.NewKey("/private"),
+			Datastore: metricsBlocks,
+		},
+		{
 			Prefix:    ds.NewKey("/"),
 			Datastore: metricsLevelDB,
 		},

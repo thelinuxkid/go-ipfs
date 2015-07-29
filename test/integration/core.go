@@ -46,7 +46,16 @@ func MocknetTestRepo(p peer.ID, h host.Host, conf testutil.LatencyConfig, routin
 			return nil, err
 		}
 		exch := bitswap.New(ctx, p, bsn, bstore, alwaysSendToPeer)
+
+		privbstore, err := blockstore.WriteCached(
+			blockstore.NewBlockstoreWithPrefix(ds, blockstore.PrivateBlockPrefix),
+			kWriteCacheElems)
+		if err != nil {
+			return nil, err
+		}
+
 		n.Blockstore = bstore
+		n.PrivBlocks = privbstore
 		n.Exchange = exch
 		n.Routing = dhtt
 		return n, nil

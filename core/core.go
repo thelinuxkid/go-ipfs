@@ -87,13 +87,16 @@ type IpfsNode struct {
 	PrivateKey ic.PrivKey // the local node's private Key
 
 	// Services
-	Peerstore  peer.Peerstore       // storage for other Peer instances
-	Blockstore bstore.GCBlockstore  // the block store (lower level)
-	Blocks     *bserv.BlockService  // the block service, get/add blocks.
-	DAG        merkledag.DAGService // the merkle dag service, get/add objects.
-	Resolver   *path.Resolver       // the path resolution system
-	Reporter   metrics.Reporter
-	Discovery  discovery.Service
+	Peerstore  peer.Peerstore      // storage for other Peer instances
+	Blockstore bstore.GCBlockstore // the block store (lower level)
+	PrivBlocks bstore.GCBlockstore // the private blockstore
+	Blocks     *bserv.BlockService // the block service, get/add blocks.
+
+	DAG       merkledag.DAGService // the merkle dag service, get/add objects.
+	PrivDAG   merkledag.DAGService // the private merkledag service for local objects
+	Resolver  *path.Resolver       // the path resolution system
+	Reporter  metrics.Reporter
+	Discovery discovery.Service
 
 	// Online
 	PeerHost     p2phost.Host        // the network host (server+client)
@@ -155,9 +158,16 @@ func NewIPFSNode(ctx context.Context, option ConfigOption) (*IpfsNode, error) {
 		node.Peerstore = peer.NewPeerstore()
 	}
 	node.DAG = merkledag.NewDAGService(node.Blocks)
-	node.Pinning, err = pin.LoadPinner(node.Repo.Datastore(), node.DAG)
+
+	privbserv, err := bserv.New(node.PrivBlocks, offline.Exchange(node.PrivBlocks))
 	if err != nil {
-		node.Pinning = pin.NewPinner(node.Repo.Datastore(), node.DAG)
+		return nil, err
+	}
+	node.PrivDAG = merkledag.NewDAGService(privbserv)
+
+	node.Pinning, err = pin.LoadPinner(node.Repo.Datastore(), node.DAG, node.PrivDAG)
+	if err != nil {
+		node.Pinning = pin.NewPinner(node.Repo.Datastore(), node.DAG, node.PrivDAG)
 	}
 	node.Resolver = &path.Resolver{DAG: node.DAG}
 
@@ -232,6 +242,13 @@ func standardWithRouting(r repo.Repo, online bool, routingOption RoutingOption, 
 		}
 
 		n.Blockstore, err = bstore.WriteCached(bstore.NewBlockstore(n.Repo.Datastore()), kSizeBlockstoreWriteCache)
+		if err != nil {
+			return nil, err
+		}
+
+		n.PrivBlocks, err = bstore.WriteCached(
+			bstore.NewBlockstoreWithPrefix(n.Repo.Datastore(), bstore.PrivateBlockPrefix),
+			kSizeBlockstoreWriteCache)
 		if err != nil {
 			return nil, err
 		}

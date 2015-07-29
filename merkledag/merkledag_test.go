@@ -38,7 +38,7 @@ func getDagservAndPinner(t *testing.T) dagservAndPinner {
 		t.Fatal(err)
 	}
 	dserv := NewDAGService(blockserv)
-	mpin := pin.NewPinner(db, dserv)
+	mpin := pin.NewPinner(db, dserv, dserv)
 	return dagservAndPinner{
 		ds: dserv,
 		mp: mpin,
