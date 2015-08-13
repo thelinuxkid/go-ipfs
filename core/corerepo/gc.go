@@ -21,11 +21,28 @@ func GarbageCollect(n *core.IpfsNode, ctx context.Context) error {
 		return err
 	}
 
+	internal, err := gc.GC(ctx, n.PrivBlocks, n.Pinning)
+	if err != nil {
+		return err
+	}
+
+	var normalDone bool
+	var internalDone bool
 	for {
 		select {
 		case _, ok := <-rmed:
 			if !ok {
-				return nil
+				if internalDone {
+					return nil
+				}
+				normalDone = true
+			}
+		case _, ok := <-internal:
+			if !ok {
+				if normalDone {
+					return nil
+				}
+				internalDone = true
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -40,10 +57,22 @@ func GarbageCollectAsync(n *core.IpfsNode, ctx context.Context) (<-chan *KeyRemo
 		return nil, err
 	}
 
+	internal, err := gc.GC(ctx, n.PrivBlocks, n.Pinning)
+	if err != nil {
+		return nil, err
+	}
+
 	out := make(chan *KeyRemoved)
 	go func() {
 		defer close(out)
 		for k := range rmed {
+			select {
+			case out <- &KeyRemoved{k}:
+			case <-ctx.Done():
+				return
+			}
+		}
+		for k := range internal {
 			select {
 			case out <- &KeyRemoved{k}:
 			case <-ctx.Done():

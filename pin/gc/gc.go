@@ -42,7 +42,7 @@ func GC(ctx context.Context, bs bstore.GCBlockstore, pn pin.Pinner) (<-chan key.
 		return nil, err
 	}
 
-	output := make(chan key.Key)
+	output := make(chan key.Key, 16)
 	go func() {
 		defer close(output)
 		for {
