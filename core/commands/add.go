@@ -6,11 +6,16 @@ import (
 	"path"
 
 	"github.com/ipfs/go-ipfs/Godeps/_workspace/src/github.com/cheggaaa/pb"
+	ds "github.com/ipfs/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-datastore"
+	syncds "github.com/ipfs/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-datastore/sync"
 	cxt "github.com/ipfs/go-ipfs/Godeps/_workspace/src/golang.org/x/net/context"
 
+	bstore "github.com/ipfs/go-ipfs/blocks/blockstore"
+	bserv "github.com/ipfs/go-ipfs/blockservice"
 	cmds "github.com/ipfs/go-ipfs/commands"
 	files "github.com/ipfs/go-ipfs/commands/files"
 	core "github.com/ipfs/go-ipfs/core"
+	offline "github.com/ipfs/go-ipfs/exchange/offline"
 	importer "github.com/ipfs/go-ipfs/importer"
 	"github.com/ipfs/go-ipfs/importer/chunk"
 	dag "github.com/ipfs/go-ipfs/merkledag"
@@ -103,13 +108,24 @@ remains to be implemented.
 		hidden, _, _ := req.Option(hiddenOptionName).Bool()
 		chunker, _, _ := req.Option(chunkerOptionName).String()
 
+		e := dagutils.NewDagEditor(n.DAG, newDirNode())
 		if hash {
-			nilnode, err := core.NewNodeBuilder().Build(n.Context())
+			nilnode, err := core.NewNodeBuilder().NilRepo().Build(n.Context())
 			if err != nil {
 				res.SetError(err, cmds.ErrNormal)
 				return
 			}
 			n = nilnode
+
+			// build mem-datastore for editor's intermediary nodes
+			bs := bstore.NewBlockstore(syncds.MutexWrap(ds.NewMapDatastore()))
+			bsrv, err := bserv.New(bs, offline.Exchange(bs))
+			if err != nil {
+				res.SetError(err, cmds.ErrNormal)
+				return
+			}
+			memds := dag.NewDAGService(bsrv)
+			e = dagutils.NewDagEditor(memds, newDirNode())
 		}
 
 		outChan := make(chan interface{}, 8)
@@ -118,7 +134,7 @@ remains to be implemented.
 		fileAdder := adder{
 			ctx:      req.Context(),
 			node:     n,
-			editor:   dagutils.NewDagEditor(n.DAG, newDirNode()),
+			editor:   e,
 			out:      outChan,
 			chunker:  chunker,
 			progress: progress,
@@ -314,7 +330,7 @@ func (params *adder) RootNode() (*dag.Node, error) {
 	// if not wrapping, AND one root file, use that hash as root.
 	if !params.wrap && len(r.Links) == 1 {
 		var err error
-		r, err = r.Links[0].GetNode(params.ctx, params.node.DAG)
+		r, err = r.Links[0].GetNode(params.ctx, params.editor.GetDagService())
 		// no need to output, as we've already done so.
 		return r, err
 	}
@@ -326,16 +342,16 @@ func (params *adder) RootNode() (*dag.Node, error) {
 
 func (params *adder) addNode(node *dag.Node, path string) error {
 	// patch it into the root
-	key, err := node.Key()
-	if err != nil {
-		return err
-	}
-
 	if path == "" {
+		key, err := node.Key()
+		if err != nil {
+			return err
+		}
+
 		path = key.Pretty()
 	}
 
-	if err := params.editor.InsertNodeAtPath(params.ctx, path, key, newDirNode); err != nil {
+	if err := params.editor.InsertNodeAtPath(params.ctx, path, node, newDirNode); err != nil {
 		return err
 	}
 
