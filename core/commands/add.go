@@ -108,7 +108,7 @@ remains to be implemented.
 		hidden, _, _ := req.Option(hiddenOptionName).Bool()
 		chunker, _, _ := req.Option(chunkerOptionName).String()
 
-		e := dagutils.NewDagEditor(n.DAG, newDirNode())
+		e := dagutils.NewDagEditor(NewMemoryDagService(), newDirNode())
 		if hash {
 			nilnode, err := core.NewNodeBuilder().NilRepo().Build(n.Context())
 			if err != nil {
@@ -116,16 +116,6 @@ remains to be implemented.
 				return
 			}
 			n = nilnode
-
-			// build mem-datastore for editor's intermediary nodes
-			bs := bstore.NewBlockstore(syncds.MutexWrap(ds.NewMapDatastore()))
-			bsrv, err := bserv.New(bs, offline.Exchange(bs))
-			if err != nil {
-				res.SetError(err, cmds.ErrNormal)
-				return
-			}
-			memds := dag.NewDAGService(bsrv)
-			e = dagutils.NewDagEditor(memds, newDirNode())
 		}
 
 		outChan := make(chan interface{}, 8)
@@ -178,6 +168,14 @@ remains to be implemented.
 				return err
 			}
 
+			if !hash {
+				// copy intermediary nodes from editor to our actual dagservice
+				err := e.WriteOutputTo(n.DAG)
+				if err != nil {
+					return err
+				}
+			}
+
 			rootnd, err := fileAdder.RootNode()
 			if err != nil {
 				return err
@@ -192,6 +190,7 @@ remains to be implemented.
 				res.SetError(err, cmds.ErrNormal)
 				return
 			}
+
 		}()
 	},
 	PostRun: func(req cmds.Request, res cmds.Response) {
@@ -278,6 +277,13 @@ remains to be implemented.
 		}
 	},
 	Type: AddedObject{},
+}
+
+func NewMemoryDagService() dag.DAGService {
+	// build mem-datastore for editor's intermediary nodes
+	bs := bstore.NewBlockstore(syncds.MutexWrap(ds.NewMapDatastore()))
+	bsrv := bserv.New(bs, offline.Exchange(bs))
+	return dag.NewDAGService(bsrv)
 }
 
 // Internal structure for holding the switches passed to the `add` call
