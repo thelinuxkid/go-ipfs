@@ -16,12 +16,12 @@ type KeyRemoved struct {
 }
 
 func GarbageCollect(n *core.IpfsNode, ctx context.Context) error {
-	rmed, err := gc.GC(ctx, n.Blockstore, n.Pinning)
+	rmed, err := gc.GC(ctx, n.DataBlocks, n.Pinning)
 	if err != nil {
 		return err
 	}
 
-	internal, err := gc.GC(ctx, n.PrivBlocks, n.Pinning)
+	internal, err := gc.GC(ctx, n.StateBlocks, n.Pinning)
 	if err != nil {
 		return err
 	}
@@ -52,12 +52,12 @@ func GarbageCollect(n *core.IpfsNode, ctx context.Context) error {
 }
 
 func GarbageCollectAsync(n *core.IpfsNode, ctx context.Context) (<-chan *KeyRemoved, error) {
-	rmed, err := gc.GC(ctx, n.Blockstore, n.Pinning)
+	rmed, err := gc.GC(ctx, n.DataBlocks, n.Pinning)
 	if err != nil {
 		return nil, err
 	}
 
-	internal, err := gc.GC(ctx, n.PrivBlocks, n.Pinning)
+	internal, err := gc.GC(ctx, n.StateBlocks, n.Pinning)
 	if err != nil {
 		return nil, err
 	}

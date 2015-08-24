@@ -63,7 +63,7 @@ func TestBitswapWithoutRouting(t *testing.T) {
 	block1 := blocks.NewBlock([]byte("block1"))
 
 	// put 1 before
-	if err := nodes[0].Blockstore.Put(block0); err != nil {
+	if err := nodes[0].DataBlocks.Put(block0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -86,7 +86,7 @@ func TestBitswapWithoutRouting(t *testing.T) {
 	}
 
 	// put 1 after
-	if err := nodes[1].Blockstore.Put(block1); err != nil {
+	if err := nodes[1].DataBlocks.Put(block1); err != nil {
 		t.Fatal(err)
 	}
 

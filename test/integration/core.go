@@ -54,8 +54,8 @@ func MocknetTestRepo(p peer.ID, h host.Host, conf testutil.LatencyConfig, routin
 			return nil, err
 		}
 
-		n.Blockstore = bstore
-		n.PrivBlocks = privbstore
+		n.DataBlocks = bstore
+		n.StateBlocks = privbstore
 		n.Exchange = exch
 		n.Routing = dhtt
 		return n, nil

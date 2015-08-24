@@ -87,10 +87,10 @@ type IpfsNode struct {
 	PrivateKey ic.PrivKey // the local node's private Key
 
 	// Services
-	Peerstore  peer.Peerstore      // storage for other Peer instances
-	Blockstore bstore.GCBlockstore // the block store (lower level)
-	PrivBlocks bstore.GCBlockstore // the private blockstore
-	Blocks     *bserv.BlockService // the block service, get/add blocks.
+	Peerstore   peer.Peerstore      // storage for other Peer instances
+	DataBlocks  bstore.GCBlockstore // the block store (lower level)
+	StateBlocks bstore.GCBlockstore // the private blockstore
+	Blocks      *bserv.BlockService // the block service, get/add blocks.
 
 	DAG       merkledag.DAGService // the merkle dag service, get/add objects.
 	PrivDAG   merkledag.DAGService // the private merkledag service for local objects
@@ -150,7 +150,7 @@ func NewIPFSNode(ctx context.Context, option ConfigOption) (*IpfsNode, error) {
 	// to be initialized at this point, and 2) which variables will be
 	// initialized after this point.
 
-	node.Blocks, err = bserv.New(node.Blockstore, node.Exchange)
+	node.Blocks, err = bserv.New(node.DataBlocks, node.Exchange)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func NewIPFSNode(ctx context.Context, option ConfigOption) (*IpfsNode, error) {
 	}
 	node.DAG = merkledag.NewDAGService(node.Blocks)
 
-	privbserv, err := bserv.New(node.PrivBlocks, offline.Exchange(node.PrivBlocks))
+	privbserv, err := bserv.New(node.StateBlocks, offline.Exchange(node.StateBlocks))
 	if err != nil {
 		return nil, err
 	}
@@ -241,12 +241,12 @@ func standardWithRouting(r repo.Repo, online bool, routingOption RoutingOption, 
 			return nil, err
 		}
 
-		n.Blockstore, err = bstore.WriteCached(bstore.NewBlockstore(n.Repo.Datastore()), kSizeBlockstoreWriteCache)
+		n.DataBlocks, err = bstore.WriteCached(bstore.NewBlockstore(n.Repo.Datastore()), kSizeBlockstoreWriteCache)
 		if err != nil {
 			return nil, err
 		}
 
-		n.PrivBlocks, err = bstore.WriteCached(
+		n.StateBlocks, err = bstore.WriteCached(
 			bstore.NewBlockstoreWithPrefix(n.Repo.Datastore(), bstore.PrivateBlockPrefix),
 			kSizeBlockstoreWriteCache)
 		if err != nil {
@@ -259,7 +259,7 @@ func standardWithRouting(r repo.Repo, online bool, routingOption RoutingOption, 
 				return nil, err
 			}
 		} else {
-			n.Exchange = offline.Exchange(n.Blockstore)
+			n.Exchange = offline.Exchange(n.DataBlocks)
 		}
 
 		success = true
@@ -306,7 +306,7 @@ func (n *IpfsNode) startOnlineServices(ctx context.Context, routingOption Routin
 		return err
 	}
 
-	n.Reprovider = rp.NewReprovider(n.Routing, n.Blockstore)
+	n.Reprovider = rp.NewReprovider(n.Routing, n.DataBlocks)
 	go n.Reprovider.ProvideEvery(ctx, kReprovideFrequency)
 
 	// setup local discovery
@@ -364,7 +364,7 @@ func (n *IpfsNode) startOnlineServicesWithHost(ctx context.Context, host p2phost
 	// setup exchange service
 	const alwaysSendToPeer = true // use YesManStrategy
 	bitswapNetwork := bsnet.NewFromIpfsHost(n.PeerHost, n.Routing)
-	n.Exchange = bitswap.New(ctx, n.Identity, bitswapNetwork, n.Blockstore, alwaysSendToPeer)
+	n.Exchange = bitswap.New(ctx, n.Identity, bitswapNetwork, n.DataBlocks, alwaysSendToPeer)
 
 	// setup name system
 	n.Namesys = namesys.NewNameSystem(n.Routing)
