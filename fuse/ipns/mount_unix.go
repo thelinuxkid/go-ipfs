@@ -19,6 +19,9 @@ func Mount(ipfs *core.IpfsNode, ipnsmp, ipfsmp string) (mount.Mount, error) {
 	allow_other := cfg.Mounts.FuseAllowOther
 
 	if ipfs.IpnsFs == nil {
+		if err := ipfs.SetupOfflineRouting(); err != nil {
+			log.Errorf("failed to setup offline routing: %s", err)
+		}
 		fs, err := ipnsfs.NewFilesystem(ipfs.Context(), ipfs.DAG, ipfs.Namesys, ipfs.Pinning, ipfs.PrivateKey)
 		if err != nil {
 			return nil, err
